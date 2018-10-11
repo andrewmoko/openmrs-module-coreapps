@@ -7,105 +7,78 @@
         it.collect{ ui.escapeHtml(it.diagnosis.formatWithoutSpecificAnswer(context.locale)) } .join(", ")
     }
     ui.includeJavascript("coreapps", "fragments/visitDetails.js")
+    ui.includeJavascript("coreapps", "visit/encounterToggle.js")
+
+    ui.includeCss("coreapps", "encounterToggle.css")
 %>
 
 <script type="text/javascript">
-    breadcrumbs.push({ label: "${ui.message("coreapps.patientDashBoard.visits")}" , link:'${ui.pageLink("coreapps", "patientdashboard/patientDashboard", [patientId: patient.id])}'});
+    breadcrumbs.push({ label: "${ui.message("coreapps.patientDashBoard.visits")}" , link:'${ui.pageLink("coreapps", "patientdashboard/patientDashboard", [patientId: patient.id])}'})
 
     jq(".collapse").collapse();
 </script>
 
-<style>
-    #i-toggle{
-        position: absolute;
-        margin-left: 950px;
-        top: 190px;
-        display: none;
-        color: #337ab7;
-        cursor: pointer;
-        font-size: 0.9em;
-}
-</style>
-
 <!-- Encounter templates -->
 <%
-	ui.includeJavascript("coreapps", "fragments/encounterTemplates.js")
+    ui.includeJavascript("coreapps", "fragments/encounterTemplates.js")
 %>
 <script type="text/javascript">
     jq(function() {
         <% encounterTemplateExtensions.each { extension ->
 			extension.extensionParams.supportedEncounterTypes?.each { encounterType -> %>
-            encounterTemplates.setTemplate('${encounterType.key}', '${extension.extensionParams.templateId}');
-            <% encounterType.value.each { parameter -> %>
-                encounterTemplates.setParameter('${encounterType.key}', '${parameter.key}', '${parameter.value}');
-            <% }
+        encounterTemplates.setTemplate('${encounterType.key}', '${extension.extensionParams.templateId}');
+        <% encounterType.value.each { parameter -> %>
+        encounterTemplates.setParameter('${encounterType.key}', '${parameter.key}', '${parameter.value}');
+        <% }
 			}
 		} %>
         encounterTemplates.setDefaultTemplate('defaultEncounterTemplate');
     });
 </script>
 <% encounterTemplateExtensions.each { extension -> %>
-    ${ui.includeFragment(extension.extensionParams.templateFragmentProviderName, extension.extensionParams.templateFragmentId)}
+${ui.includeFragment(extension.extensionParams.templateFragmentProviderName, extension.extensionParams.templateFragmentId)}
 <% } %>
 <!-- End of encounter templates -->
 
-<i id="i-toggle" title="${ui.message('coreapps.expandAll')}"
+<i id="i-toggle" title="${ui.message('coreapps.showAllEncounterDetails')}"
    class="toggle-icon icon-arrow-down small caret-color"
    onclick="toggle()"></i>
 
 <script type="text/template" id="visitDetailsTemplate">
-    ${ ui.includeFragment("coreapps", "patientdashboard/visitDetailsTemplate") }
+${ ui.includeFragment("coreapps", "patientdashboard/visitDetailsTemplate") }
 </script>
 
 <script type="text/javascript">
     jq(function(){
         var visitId;
         <% if (param.visitId != null) { %>
-            visitId = ${ param.visitId };
+        visitId = ${ param.visitId };
         <% } else if (activeVisit != null) { %>
-            visitId = ${ activeVisit.visit.id };
+        visitId = ${ activeVisit.visit.id };
         <% } %>
         var fromEncounter = 0;
         <% if (param.fromEncounter != null) { %>
-            fromEncounter = ${ param.fromEncounter };
+        fromEncounter = ${ param.fromEncounter };
         <% } %>
         <% if (param.encounterCount != null) { %>
-            encounterCount = ${ param.encounterCount }; // This variable is defined in patientdashboard/patientDashboard.gsp
+        encounterCount = ${ param.encounterCount }; // This variable is defined in patientdashboard/patientDashboard.gsp
         <% } %>
         loadTemplates(visitId, ${ patient.id }, fromEncounter, encounterCount);
 
         <%
-            def visits = patient.allVisitsUsingWrappers;
-            visits.eachWithIndex{ wrapper, idx ->
-                 if(wrapper.getVisit().visitId == param.visitId ||
-                    wrapper.getVisit().visitId == activeVisit.visit.id){
-                    if(wrapper.hasEncounters()){ %>
-                        jq('#i-toggle').show();
-                    <%}
-                 }
+            if ( activeVisit != null){
+                if(activeVisit.hasEncounters() && activeVisit.getVisit().getEncounters().size() < 20){ %>
+        jq('#i-toggle').show();
+        <%}
             }
         %>
     });
-
-    function toggle(){
-        jq('.collapse').removeClass('open');
-        jq(".view-details").click();
-        if(jq('#i-toggle').hasClass('icon-arrow-up')){
-            jq('#i-toggle').removeClass('icon-arrow-up');
-            jq('#i-toggle').addClass('icon-arrow-down');
-            jq('#i-toggle').attr('title', "${ui.message('coreapps.expandAll')}");
-        } else {
-            jq('#i-toggle').removeClass('icon-arrow-down');
-            jq('#i-toggle').addClass('icon-arrow-up');
-            jq('#i-toggle').attr('title', "${ui.message('coreapps.collapseAll')}");
-        }
-    }
 </script>
 
 <ul id="visits-list" class="left-menu">
 
     <%
-        visits = patient.allVisitsUsingWrappers
+        def visits = patient.allVisitsUsingWrappers
         visits.eachWithIndex { wrapper, idx ->
             def primaryDiagnoses = wrapper.getUniqueDiagnoses(true, false)
     %>
@@ -114,21 +87,21 @@
             <i class="icon-time"></i>
             ${ui.format(wrapper.startDate)}
             <% if(wrapper.stopDate != null) { %>
-                - ${ui.format(wrapper.stopDate)}
+            - ${ui.format(wrapper.stopDate)}
             <% } else { %>
-                (${ ui.message("coreapps.patientDashBoard.activeSince")} ${timeFormat.format(wrapper.visit.startDatetime)})
+            (${ ui.message("coreapps.patientDashBoard.activeSince")} ${timeFormat.format(wrapper.visit.startDatetime)})
             <% } %>
         </span>
 
         <% if (primaryDiagnoses != null) { %>  <!-- if primary diagnosis is null, don't display box at all, if empty, display "no diagnosis" message -->
-            <span class="menu-title">
-                <i class="icon-stethoscope"></i>
-                <% if (!primaryDiagnoses.empty) { %>
-                    ${ formatDiagnoses(primaryDiagnoses) }
-                <% }  else { %>
-                    ${ ui.message("coreapps.patientDashBoard.noDiagnosis")}
-                <% } %>
-            </span>
+        <span class="menu-title">
+            <i class="icon-stethoscope"></i>
+            <% if (!primaryDiagnoses.empty) { %>
+            ${ formatDiagnoses(primaryDiagnoses) }
+            <% }  else { %>
+            ${ ui.message("coreapps.patientDashBoard.noDiagnosis")}
+            <% } %>
+        </span>
         <% } %>
         <span class="arrow-border"></span>
         <span class="arrow"></span>
@@ -153,27 +126,27 @@
     <% } %>
 
     <% if(patient.allVisitsUsingWrappers.size == 0) { %>
-        <div class="no-results">
-            ${ ui.message("coreapps.patientDashBoard.noVisits")}
-        </div>
+    <div class="no-results">
+        ${ ui.message("coreapps.patientDashBoard.noVisits")}
+    </div>
     <% } %>
 </ul>
 
 <div class="main-content">
     <div id="visit-details">
         <% if (patient.patient.dead) { %>
-            <h4>${ ui.message('coreapps.noActiveVisit') }</h4>
-            <p class="spaced">${ ui.message('coreapps.deadPatient.description') }</p>
+        <h4>${ ui.message('coreapps.noActiveVisit') }</h4>
+        <p class="spaced">${ ui.message('coreapps.deadPatient.description') }</p>
         <% } else if (!activeVisit) { %>
-            <h4>${ ui.message('coreapps.noActiveVisit') }</h4>
-            <p class="spaced">${ ui.message('coreapps.noActiveVisit.description') }</p>
-            <% if (sessionContext.userContext.hasPrivilege("Task: coreapps.createVisit")) { %>
-                <p class="spaced">
-                    <a id="noVisitShowVisitCreationDialog" href="javascript:visit.showQuickVisitCreationDialog(${patient.id})" class="button task">
-                        <i class="icon-check-in small"></i>${ ui.message("coreapps.task.startVisit.label") }
-                    </a>
-                </p>
-            <% } %>
+        <h4>${ ui.message('coreapps.noActiveVisit') }</h4>
+        <p class="spaced">${ ui.message('coreapps.noActiveVisit.description') }</p>
+        <% if (sessionContext.userContext.hasPrivilege("Task: coreapps.createVisit")) { %>
+        <p class="spaced">
+            <a id="noVisitShowVisitCreationDialog" href="javascript:visit.showQuickVisitCreationDialog(${patient.id})" class="button task">
+                <i class="icon-check-in small"></i>${ ui.message("coreapps.task.startVisit.label") }
+            </a>
+        </p>
+        <% } %>
         <% } %>
     </div>
 
